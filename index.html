@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Content Moderation - Toxicity Detector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 20px;
+        }
+
+        .input-section {
+            margin-bottom: 20px;
+        }
+
+        .input-section label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+            transition: border-color 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .threshold-section {
+            margin: 20px 0;
+        }
+
+        .threshold-section label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .threshold-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+
+        .threshold-value {
+            font-size: 1.2em;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        button {
+            flex: 1;
+            padding: 15px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: bold;
+        }
+
+        .btn-analyze {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-clear {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .result {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result.safe {
+            background: #d4edda;
+            border: 2px solid #28a745;
+        }
+
+        .result.toxic {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .result-icon {
+            font-size: 2em;
+        }
+
+        .result-status {
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .result.safe .result-status {
+            color: #28a745;
+        }
+
+        .result.toxic .result-status {
+            color: #dc3545;
+        }
+
+        .result-details {
+            margin-top: 15px;
+        }
+
+        .result-detail {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+
+        .result-detail:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: bold;
+            color: #555;
+        }
+
+        .detail-value {
+            font-weight: bold;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 30px;
+            background: #f0f0f0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .examples {
+            margin-top: 20px;
+        }
+
+        .examples h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+
+        .example-btn {
+            display: inline-block;
+            padding: 10px 15px;
+            margin: 5px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.9em;
+        }
+
+        .example-btn:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        .footer a {
+            color: white;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .footer a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ AI Content Moderator</h1>
+            <p>Detect toxic content using advanced NLP & Machine Learning</p>
+        </div>
+
+        <div class="card">
+            <div class="input-section">
+                <label for="textInput">Enter text to analyze:</label>
+                <textarea 
+                    id="textInput" 
+                    placeholder="Type or paste any text here... (e.g., comments, messages, reviews)"
+                ></textarea>
+            </div>
+
+            <div class="threshold-section">
+                <label>
+                    Toxicity Threshold: 
+                    <span class="threshold-value" id="thresholdValue">50%</span>
+                </label>
+                <input 
+                    type="range" 
+                    id="thresholdSlider" 
+                    class="threshold-slider" 
+                    min="0" 
+                    max="100" 
+                    value="50"
+                >
+                <p style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                    Higher = Stricter (fewer false positives) | Lower = More sensitive (catches more)
+                </p>
+            </div>
+
+            <div class="buttons">
+                <button class="btn-analyze" id="analyzeBtn">
+                    🔍 Analyze Content
+                </button>
+                <button class="btn-clear" id="clearBtn">
+                    🗑️ Clear
+                </button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analyzing content...</p>
+            </div>
+
+            <div class="result" id="result">
+                <div class="result-header">
+                    <span class="result-icon" id="resultIcon">✓</span>
+                    <span class="result-status" id="resultStatus">SAFE</span>
+                </div>
+                <div class="result-details">
+                    <div class="result-detail">
+                        <span class="detail-label">Toxicity Confidence:</span>
+                        <span class="detail-value" id="confidenceValue">0%</span>
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" id="confidenceFill" style="width: 0%">
+                            <span id="confidenceText">0%</span>
+                        </div>
+                    </div>
+                    <div class="result-detail">
+                        <span class="detail-label">Threshold Used:</span>
+                        <span class="detail-value" id="thresholdUsed">50%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="examples">
+                <h3>📝 Try These Examples:</h3>
+                <div class="example-btn" data-text="Thank you so much for your help!">Positive Comment</div>
+                <div class="example-btn" data-text="You're an idiot and nobody likes you.">Toxic Comment</div>
+                <div class="example-btn" data-text="The weather is nice today.">Neutral Comment</div>
+                <div class="example-btn" data-text="I hate you and I hope you fail.">Hateful Comment</div>
+                <div class="example-btn" data-text="Great work on the presentation!">Compliment</div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Built with ❤️ using Python, NLP & Machine Learning</p>
+            <p><a href="https://github.com/yourusername/content-moderation-bot" target="_blank">View on GitHub</a></p>
+        </div>
+    </div>
+
+    <script>
+        // NOTE: This is a frontend-only demo version
+        // In production, you would call your actual Flask API
+        
+        const textInput = document.getElementById('textInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const result = document.getElementById('result');
+        const loading = document.getElementById('loading');
+        const thresholdSlider = document.getElementById('thresholdSlider');
+        const thresholdValue = document.getElementById('thresholdValue');
+
+        // Update threshold display
+        thresholdSlider.addEventListener('input', (e) => {
+            thresholdValue.textContent = e.target.value + '%';
+        });
+
+        // Example buttons
+        document.querySelectorAll('.example-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                textInput.value = btn.getAttribute('data-text');
+            });
+        });
+
+        // Clear button
+        clearBtn.addEventListener('click', () => {
+            textInput.value = '';
+            result.style.display = 'none';
+        });
+
+        // Analyze button
+        analyzeBtn.addEventListener('click', async () => {
+            const text = textInput.value.trim();
+            
+            if (!text) {
+                alert('Please enter some text to analyze!');
+                return;
+            }
+
+            // Show loading
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            analyzeBtn.disabled = true;
+
+            // Simulate API call (replace with real API call)
+            setTimeout(() => {
+                // Simple demo logic (replace with real API)
+                const toxicWords = ['idiot', 'hate', 'stupid', 'worthless', 'fail', 'loser', 'dumb'];
+                const textLower = text.toLowerCase();
+                const hasToxicWord = toxicWords.some(word => textLower.includes(word));
+                
+                const threshold = parseInt(thresholdSlider.value);
+                const confidence = hasToxicWord ? Math.floor(Math.random() * 30) + 70 : Math.floor(Math.random() * 40);
+                const isToxic = confidence > threshold;
+
+                displayResult(isToxic, confidence, threshold);
+                
+                loading.style.display = 'none';
+                analyzeBtn.disabled = false;
+            }, 1500);
+        });
+
+        function displayResult(isToxic, confidence, threshold) {
+            const resultIcon = document.getElementById('resultIcon');
+            const resultStatus = document.getElementById('resultStatus');
+            const confidenceValue = document.getElementById('confidenceValue');
+            const confidenceFill = document.getElementById('confidenceFill');
+            const confidenceText = document.getElementById('confidenceText');
+            const thresholdUsed = document.getElementById('thresholdUsed');
+
+            result.classList.remove('safe', 'toxic');
+            result.classList.add(isToxic ? 'toxic' : 'safe');
+            
+            resultIcon.textContent = isToxic ? '🚫' : '✓';
+            resultStatus.textContent = isToxic ? 'FLAGGED AS TOXIC' : 'SAFE CONTENT';
+            confidenceValue.textContent = confidence + '%';
+            confidenceFill.style.width = confidence + '%';
+            confidenceText.textContent = confidence + '%';
+            thresholdUsed.textContent = threshold + '%';
+
+            result.style.display = 'block';
+        }
+
+        // For production, replace the setTimeout with real API call:
+        /*
+        async function analyzeWithAPI(text, threshold) {
+            const response = await fetch('http://localhost:5000/moderate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    text: text,
+                    threshold: threshold / 100
+                })
+            });
+            
+            const data = await response.json();
+            return data.result;
+        }
+        */
+    </script>
+</body>
+</html>
